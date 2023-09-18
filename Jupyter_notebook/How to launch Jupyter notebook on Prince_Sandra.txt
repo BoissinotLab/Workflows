@@ -1,0 +1,31 @@
+################## Running Jupyter notebook on Prince ##########
+
+# Open a Terminal window and login into Prince
+ssh -Y NETID@prince.hpc.nyu.edu
+
+# Give your NYU password
+
+# Place yourself in your scratch directory
+cd $SCRATCH
+
+# Create a myjuptyer directory and copy the run-jupyter.sbatch file from the example directory in Prince (or create it)
+# Note: you will have to do that only once
+cp /share/apps/examples/jupyter/run-jupyter.sbatch /scratch/NETID/myjupyter
+
+# Run the jupyter job
+$ sbatch /scratch/sg5533/myjupyter/run-jupyter.sbatch
+
+# Open the slurm associated with the jupyter job
+more slurm-JOBID.out
+
+# Follow the instructions in the slurm, that is: 1) open a new terminal window and copy-paste the command line looking like 
+# ssh -L 59630:localhost:59630 NETID@prince.hpc.nyu.edu
+# Give your NYU password
+
+# Open a new web browser window and copy-paste the URL given at the bottom of the slurm-JOBID.out
+# BIM! you're in Jupyter notebook :) 
+# you can now browse your direcories and files, open plots, create and run R or Python scripts, and much, much more!! 
+
+# Note: the time and memory allocated for your run is at the top of your script run-jupyter.sbatch so if you need more of it, thats is wher eyou change it.
+
+
