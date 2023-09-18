@@ -1,0 +1,92 @@
+---
+global:
+    # Initial Directory Setup
+    - indir:      "/scratch/ieh211/Ptychadena/resequencing/alignment_snpcalling/analysis_imtiyaz"
+    - outdir:     "{$self->transposon_dir}"
+    # Find Samples
+    - sample_glob: "/scratch/ieh211/Ptychadena/resequencing/alignment_snpcalling/analysis_imtiyaz/*"
+    - find_by_dir: 1
+    # Output Directory Structure
+    - by_sample_outdir: 1
+    # Processed Dirs
+    - picard_dir: "/scratch/ieh211/Ptychadena/resequencing/alignment_snpcalling/analysis_imtiyaz/{$sample}/picard"
+    # Analysis Dirs
+    - transposon_dir: "/scratch/ieh211/Ptychadena/TEs/MEI_detection/MELT/MELTv2.1.5/{$self->transposon_name}"
+    - transposon_name: "TE4_MELT"
+    # Reference Data
+    - reference: "/scratch/ieh211/Ptychadena/dovetails_genome/ptychadena_dovetail_1.fa"
+    - annotation: "/scratch/ieh211/Ptychadena/TEs/MEI_detection/MELT/MELTv2.1.5/pneumanni.bed"
+    # Shortcuts for long read names
+    - BAM:        "{$self->picard_dir}/{$sample}_withrg.csorted.cleaned.aligned.bam"
+    # HPC Directives
+    - HPC:
+       - partition: 'serial'
+       - module:  'gencore gencore_variant_detection/1.0'
+       - cpus_per_task: 1
+       - commands_per_node: 1
+rules:
+    - pre_processing:
+        local:
+                - HPC:
+                  - mem: '80GB'
+                  - cpus_per_task: 4
+                  - walltime: '06:00:00'
+        process: |
+                #TASK tags={$sample}
+                java -Xmx2G -jar /scratch/ieh211/Ptychadena/TEs/MEI_detection/MELT/MELTv2.1.5/MELT.jar \
+                     Preprocess -bamfile {$self->BAM} \
+                     -h {$self->reference}
+    - indiv_analysis:
+        local:
+                - INPUT: "{$self->BAM}"
+                - HPC:
+                  - deps: 'pre_processing'
+                  - mem: '100GB'
+                  - walltime: '09:00:00'
+        process: |
+                #TASK tags={$sample}
+                java -Xmx2G -jar /scratch/ieh211/Ptychadena/melt/MELTv2.1.5/MELT.jar \
+                    IndivAnalysis -c 18 -t {$self->transposon_dir}/{$self->transposon_name}.zip \
+                    -bamfile {$self->INPUT} -h {$self->reference} \
+                    -w {$self->transposon_dir} 
+    - group_analysis:
+        local:
+                - override_process: 1
+                - HPC:
+                  - mem: '105GB'
+                  - walltime: '24:00:00'
+        process: |
+                java -Xmx2G -jar /scratch/ieh211/Ptychadena/melt/MELTv2.1.5/MELT.jar \
+                    GroupAnalysis -discoverydir {$self->transposon_dir} \
+                    -w {$self->transposon_dir} \
+                    -t {$self->transposon_dir}/{$self->transposon_name}.zip \
+                    -h {$self->reference} \
+                    -n {$self->annotation} 
+    - genotype:
+        local:
+                - HPC:
+                  - deps: 'group_analysis'
+                  - mem: '80GB'
+                  - walltime: '12:00:00'
+        process: |
+                #TASK tags={$sample}
+                java -Xmx2G -jar /scratch/ieh211/Ptychadena/melt/MELTv2.1.5/MELT.jar \
+                    Genotype -bamfile {$self->BAM} \
+                    -w {$self->transposon_dir} \
+                    -t {$self->transposon_dir}/{$self->transposon_name}.zip \
+                    -h {$self->reference} \
+                    -p {$self->transposon_dir}
+    - make_vcf:
+        local:
+                - override_process: 1
+                - HPC:
+                  - deps: 'genotype'
+                  - mem: '45GB'
+                  - walltime: '06:00:00'
+        process: |
+                java -Xmx2G -jar /scratch/ieh211/Ptychadena/melt/MELTv2.1.5/MELT.jar \
+                    MakeVCF -genotypingdir {$self->transposon_dir} \
+                    -w {$self->transposon_dir} \
+                    -t {$self->transposon_dir}/{$self->transposon_name}.zip \
+                    -h {$self->reference} \
+                    -p {$self->transposon_dir} 

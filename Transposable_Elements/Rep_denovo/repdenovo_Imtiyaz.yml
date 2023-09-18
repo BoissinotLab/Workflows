@@ -1,0 +1,46 @@
+#first download the REPdenovo package and unzip the files
+#edit the configuration files
+#then run this .yml script using BioSAILS
+---
+global:
+    # ROOT Directory configurations
+    - indir: /scratch/ieh211/Ptychadena/REPdenovo-master
+    - outdir: data/analysis/
+    - root_in_dir: ./
+    # Find Samples
+    - sample_rule: "(.*)_read*"
+    - by_sample_outdir: 1
+    - find_by_dir: 0
+    #HPC Directives
+    - HPC:
+       - module: 'gencore gencore_biosails gencore_variant_detection gencore_de_novo_genomic'
+       - commands_per_node: 1
+       - cpus_per_task: 1
+rules:
+    - repdenovo_Assembly:
+        local:
+                - create_outdir: 1
+                - HPC:
+                   - walltime: '60:00:00'
+                   - mem: '400GB'
+                   - cpus_per_task: 12
+        process: |
+            #TASK tags={$sample}
+            python main.py -c Assembly \
+            -g {$sample}_configuration_10x.txt \
+            -r {$sample}_input_paired_end_reads.txt
+
+    - repdenovo_Scaffold:
+        local:
+                - create_outdir: 1
+                - HPC:
+                   - deps: 'repdenovo_Assembly'
+                   - walltime: '36:00:00'
+                   - mem: '100GB'
+                   - cpus_per_task: 12
+
+        process: |
+            #TASK tags={$sample}
+            python main.py -c Scaffold \
+            -g {$sample}_configuration_10x.txt \
+            -r {$sample}_input_paired_end_reads.txt 

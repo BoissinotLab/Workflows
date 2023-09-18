@@ -1,0 +1,63 @@
+---
+global:
+    # Initial Directory Setup
+    - indir:      "/scratch/ieh211/Ptychadena/resequencing/alignment_snpcalling/analysis_imtiyaz"
+    - outdir:     "/scratch/ieh211/Ptychadena/TEs/MEI_detection/MELT/MELTv2.1.5"
+    # Find Samples
+    - sample_glob: "/scratch/ieh211/Ptychadena/resequencing/alignment_snpcalling/analysis_imtiyaz/*"
+    - find_by_dir: 1
+    # Output Directory Structure
+    - by_sample_outdir: 1
+    # Processed Dirs
+    - picard_dir: "/scratch/ieh211/Ptychadena/resequencing/alignment_snpcalling/analysis_imtiyaz/{$sample}/picard"
+    # Analysis Dir
+    - vcf: "{$self->outdir}/vcf"
+    - transposon_dir: "/scratch/ieh211/Ptychadena/TEs/MEI_detection/MELT/MELTv2.1.5/{$self->transposon_name}"
+    - transposon_name: "TE4e10_MELT"
+    # Reference Data
+    - reference: "/scratch/ieh211/Ptychadena/dovetails_genome/ptychadena_dovetail_1.fa"
+    - annotation: "/scratch/ieh211/Ptychadena/TEs/MEI_detection/MELT/MELTv2.1.5/{$self->transposon_name}/{$self->transposon_name}.bed"
+    # Shortcuts for long read names
+    - BAM:        "{$self->picard_dir}/{$sample}_withrg.csorted.cleaned.aligned.bam"
+    # HPC Directives
+    - HPC:
+       - partition: 'serial'
+       - module:  'gencore gencore_variant_detection/1.0'
+       - cpus_per_task: 1
+       - commands_per_node: 1
+rules:
+    - genotype:
+        local:
+                - HPC:
+                  - cpus-per-task: 6
+                  - mem: '118GB'
+                  - walltime: '72:00:00'
+        process: |
+                #TASK tags={$sample}
+                java -Xmx70G -jar /scratch/ieh211/Ptychadena/TEs/MEI_detection/MELT/MELTv2.1.5/MELT.jar \
+                    Deletion-Genotype -bamfile {$self->BAM} \
+                    -w {$self->transposon_dir} \
+                    -bed {$self->annotation} \
+                    -h {$self->reference}
+    - list:
+        local:
+                - override_process: 1
+                - HPC:
+                  - mem: '1GB'
+                  - deps: 'genotype'
+        process: |
+                readlink -f {$self->transposon_dir}/*.del.tsv > {$self->transposon_dir}/list.of.outputs.txt
+    - merge:
+        local:
+                - override_process: 1
+                - HPC:
+                  - mem: '40GB'
+                  - deps: 'list'
+                  - cpus-per-task: 4
+                  - walltime: '72:00:00'
+        process: |
+                java -Xmx2G -jar /scratch/ieh211/Ptychadena/TEs/MEI_detection/MELT/MELTv2.1.5/MELT.jar \
+                    Deletion-Merge -mergelist {$self->transposon_dir}/list.of.outputs.txt \
+                    -bed {$self->annotation} \
+                    -h {$self->reference} \
+                    -o {$self->transposon_dir}
