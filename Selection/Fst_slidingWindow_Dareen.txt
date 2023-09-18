@@ -1,0 +1,50 @@
+## Sliding genomic windows analysis for Fst: (Genomic differentiation)
+
+## Setting up - create a folder and place the following scripts in it:
+
+- parseVCF.py
+- popgenWindows.py
+
+## Convert the vcf file into geno file format. To do that use the parseVCF.py script:
+
+
+parseVCF.py -i Xenopus_NonHybrids.vcf.gz | bgzip > Xenopus_NonHybrids.geno.gz
+
+## check the file:
+
+head Xenopus_NonHybrids.geno | cut -f 1-10 | column -t
+
+## Comprise the genotype matrix:
+
+bgzip > Xenopus_NonHybrids.geno.gz
+
+## create a population file that you can give to the script so that you don’t need to manually input each of the sample names. (either use grep or create txt files)
+
+## Perform our analyses.
+
+./popgenWindows.py -g Xenopus_NonHybrids.geno.gz -o div_stats.csv \
+   -f phased -w 100000 -m 10 -s 25000 \
+   -p Blue -p Green -p Purple -p Yellow \
+   --popsFile samplesPop \
+   --writeFailedWindow
+   
+
+# -p Blue = a text file with a list of the full sample name, --popsFile samplesPop = a file with a list of the samples and their assigned population
+
+
+
+## Visualising the results in R:
+# clear the r environment
+rm(list = ls())
+# load the tidyverse library
+library(tidyverse)
+#Read in the data:
+infile <- "./div_stats.csv"
+Xenopus <- read_csv(infile)
+
+## Plot your statistics to get a better idea of what is going on here - FST:
+
+# fst
+ggplot(Xenopus, aes(mid, fst_Xenopus)) + geom_line()
+
+
